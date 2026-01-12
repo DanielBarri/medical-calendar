@@ -8,7 +8,7 @@
  * - Timeline vertical with full 24-hour day (00:00 - 24:00)
  * - Configurable time slots (15, 30, 60 minutes)
  * - Grid visual dividing each hour
- * - 12-hour format with AM/PM
+ * - 24-hour format (00:00 to 24:00)
  * - Sticky positioning for scroll synchronization
  * - Performance optimized with useMemo
  *
@@ -33,7 +33,7 @@ interface TimeSlot {
   minute: number;
 
   /**
-   * Display label (e.g., "9:00 AM", "9:30 AM")
+   * Display label in 24-hour format (e.g., "09:00", "09:30")
    */
   label: string;
 
@@ -96,14 +96,13 @@ function generateTimeSlots(
         break;
       }
 
-      const displayHour = hour === 0 || hour === 24 ? 12 : hour > 12 ? hour - 12 : hour;
-      const period = hour < 12 || hour === 24 ? 'AM' : 'PM';
+      const hourStr = hour.toString().padStart(2, '0');
       const minuteStr = minute.toString().padStart(2, '0');
 
       slots.push({
         hour,
         minute,
-        label: `${displayHour}:${minuteStr} ${period}`,
+        label: `${hourStr}:${minuteStr}`,
         isHourStart: minute === 0,
       });
     }
