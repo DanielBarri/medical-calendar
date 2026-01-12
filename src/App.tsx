@@ -1,35 +1,36 @@
-import { useState } from "react";
-import "./App.css";
-import SamplePage from "./SamplePage";
+/**
+ * App Component
+ *
+ * Main application component for the Medical Calendar.
+ * Renders the Calendar component with default configuration.
+ */
+
+import Calendar from './components/Calendar';
+import './App.css';
 
 function App() {
-    const [showSample, setShowSample] = useState(false);
+  /**
+   * Handle date change events from the Calendar
+   */
+  const handleDateChange = (date: Date) => {
+    console.log('Date changed:', date);
+  };
 
-    if (showSample) {
-        return <SamplePage />;
-    }
+  /**
+   * Handle view change events from the Calendar
+   */
+  const handleViewChange = (view: 'day' | '3-day' | 'week') => {
+    console.log('View changed:', view);
+  };
 
-    return (
-        <div className="calendar-container" style={{
-            minHeight: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 'var(--spacing-lg)'
-        }}>
-            <h1 style={{
-                fontSize: 'var(--font-size-2xl)',
-                fontWeight: 'var(--font-weight-bold)',
-                color: 'var(--color-text-primary)'
-            }}>
-                Hello World!!
-            </h1>
-            <button onClick={() => setShowSample(true)}>
-                View Sample Page
-            </button>
-        </div>
-    );
+  return (
+    <div className="app">
+      <Calendar
+        onDateChange={handleDateChange}
+        onViewChange={handleViewChange}
+      />
+    </div>
+  );
 }
 
 export default App;
