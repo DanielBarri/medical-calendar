@@ -6,29 +6,32 @@
  */
 
 import Calendar from './components/Calendar';
+import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
 function App() {
   /**
    * Handle date change events from the Calendar
    */
-  const handleDateChange = (date: Date) => {
-    console.log('Date changed:', date);
+  const handleDateChange = () => {
+    // Handle date change logic here
   };
 
   /**
    * Handle view change events from the Calendar
    */
-  const handleViewChange = (view: 'day' | '3-day' | 'week') => {
-    console.log('View changed:', view);
+  const handleViewChange = () => {
+    // Handle view change logic here
   };
 
   return (
     <div className="app">
-      <Calendar
-        onDateChange={handleDateChange}
-        onViewChange={handleViewChange}
-      />
+      <ErrorBoundary>
+        <Calendar
+          onDateChange={handleDateChange}
+          onViewChange={handleViewChange}
+        />
+      </ErrorBoundary>
     </div>
   );
 }

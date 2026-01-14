@@ -7,7 +7,8 @@ import {
 import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button.variants"
 
 function Calendar({
   className,
@@ -108,7 +109,7 @@ function Calendar({
         range_middle: cn("rounded-none", defaultClassNames.range_middle),
         range_end: cn("bg-[var(--color-primary-light)] rounded-r-[var(--radius-md)]", defaultClassNames.range_end),
         today: cn(
-          "bg-[var(--color-primary-light)] text-[var(--color-primary)] rounded-[var(--radius-md)] font-[var(--font-weight-semibold)] data-[selected=true]:rounded-[var(--radius-md)]",
+          "bg-[var(--color-accent)]/20 text-[var(--color-text-primary)] font-[var(--font-weight-bold)] rounded-lg",
           defaultClassNames.today
         ),
         outside: cn(
@@ -201,14 +202,15 @@ function CalendarDayButton({
       className={cn(
         "flex aspect-square h-auto w-full min-w-[--cell-size] flex-col gap-[var(--spacing-xs)] font-[var(--font-weight-medium)] leading-none text-[var(--color-text-primary)]",
         "hover:bg-[var(--color-primary-light)] hover:text-[var(--color-primary)] transition-all duration-[var(--transition-fast)]",
-        "rounded-[var(--radius-md)]",
+        "rounded-lg",
         "data-[selected-single=true]:bg-[var(--color-primary)] data-[selected-single=true]:text-white data-[selected-single=true]:font-[var(--font-weight-semibold)] data-[selected-single=true]:shadow-[var(--shadow-sm)]",
         "data-[range-middle=true]:bg-[var(--color-primary-light)] data-[range-middle=true]:text-[var(--color-primary)]",
         "data-[range-start=true]:bg-[var(--color-primary)] data-[range-start=true]:text-white",
         "data-[range-end=true]:bg-[var(--color-primary)] data-[range-end=true]:text-white",
-        "data-[range-end=true]:rounded-[var(--radius-md)] data-[range-middle=true]:rounded-[var(--radius-sm)] data-[range-start=true]:rounded-[var(--radius-md)]",
+        "data-[range-end=true]:rounded-lg data-[range-middle=true]:rounded-[var(--radius-sm)] data-[range-start=true]:rounded-lg",
         "group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:ring-[3px] group-data-[focused=true]/day:ring-[var(--color-primary)]/30 group-data-[focused=true]/day:border-[var(--color-primary)]",
         "[&>span]:text-[var(--font-size-xs)] [&>span]:opacity-70",
+        modifiers.today && !modifiers.selected && "bg-[var(--color-accent)] text-white font-[var(--font-weight-bold)]",
         defaultClassNames.day,
         className
       )}

@@ -18,14 +18,16 @@
  */
 
 import { useCallback, useMemo, useState, useEffect } from 'react';
-import type { CalendarHeaderProps } from '../types/calendar';
+import type { CalendarHeaderProps, CalendarView } from '../types/calendar';
 import {
-  formatHeaderDate,
+  formatHeaderDateRange,
   navigatePrevious,
   navigateNext,
   getToday,
   checkIsToday,
 } from '../utils/dateHelpers';
+import { useWorkingHoursContext } from '../hooks/useWorkingHoursContext';
+import { MAX_HOUR } from '../constants/calendar';
 import { Button } from './ui/button';
 import { Calendar } from './ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
@@ -45,6 +47,11 @@ export default function CalendarHeader({
   onViewChange,
 }: CalendarHeaderProps) {
   /**
+   * Access working hours from context
+   */
+  const { workingHours, setWorkingHours } = useWorkingHoursContext();
+
+  /**
    * State for controlling the calendar popover
    */
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -58,6 +65,20 @@ export default function CalendarHeader({
    * State for slot height selection
    */
   const [slotHeight, setSlotHeight] = useState<'small' | 'medium' | 'large'>('medium');
+
+  /**
+   * Local state for working hours (synced with context via apply button)
+   */
+  const [localStartHour, setLocalStartHour] = useState(workingHours.startHour);
+  const [localEndHour, setLocalEndHour] = useState(workingHours.endHour);
+
+  /**
+   * Sync local state when context working hours change
+   */
+  useEffect(() => {
+    setLocalStartHour(workingHours.startHour);
+    setLocalEndHour(workingHours.endHour);
+  }, [workingHours]);
 
   /**
    * Update CSS variable when slot height changes
@@ -76,7 +97,7 @@ export default function CalendarHeader({
    */
   const isCurrentDateToday = useMemo(() => checkIsToday(selectedDate), [selectedDate]);
 
-  const formattedDate = useMemo(() => formatHeaderDate(selectedDate), [selectedDate]);
+  const formattedDate = useMemo(() => formatHeaderDateRange(selectedDate, view), [selectedDate, view]);
 
   /**
    * Memoized event handlers to prevent unnecessary re-renders
@@ -105,13 +126,37 @@ export default function CalendarHeader({
     [onDateChange]
   );
 
-  // Memoized view change handler for Select component
+  /**
+   * Memoized view change handler with runtime validation
+   * Ensures only valid view values are passed through
+   */
   const handleViewChange = useCallback(
     (newView: string) => {
-      onViewChange(newView as 'day' | '3-day' | 'week');
+      // Runtime validation: ensure newView is a valid CalendarView
+      const validViews: CalendarView[] = ['day', '3-day', 'week'];
+      if (validViews.includes(newView as CalendarView)) {
+        onViewChange(newView as CalendarView);
+      } else {
+        console.error(`Invalid calendar view: ${newView}. Defaulting to 'day'.`);
+        onViewChange('day');
+      }
     },
     [onViewChange]
   );
+
+  /**
+   * Handle working hours apply with validation
+   * Ensures start hour is before end hour
+   */
+  const handleApplyWorkingHours = useCallback(() => {
+    if (localStartHour >= localEndHour) {
+      // Validation: start hour must be before end hour
+      console.error('Invalid working hours: start hour must be before end hour');
+      return;
+    }
+    setWorkingHours({ startHour: localStartHour, endHour: localEndHour });
+    setIsConfigOpen(false);
+  }, [localStartHour, localEndHour, setWorkingHours]);
 
   return (
     <header
@@ -230,7 +275,8 @@ export default function CalendarHeader({
                   mode="single"
                   selected={selectedDate}
                   onSelect={handleCalendarSelect}
-                  initialFocus
+                  today={new Date()}
+                  autoFocus
                 />
               </PopoverContent>
             </Popover>
@@ -273,30 +319,103 @@ export default function CalendarHeader({
                 </svg>
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>Configuración del Calendario</DialogTitle>
                 <DialogDescription>
-                  Ajusta la altura de las celdas del calendario para personalizar tu vista.
+                  Ajusta la altura de las celdas y el horario de atención.
                 </DialogDescription>
               </DialogHeader>
-              <div className="py-6">
-                <label className="text-sm font-medium text-[var(--color-text-primary)] mb-4 block">
-                  Altura de las celdas
-                </label>
-                <Select value={slotHeight} onValueChange={(value: string) => setSlotHeight(value as 'small' | 'medium' | 'large')}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="small">Pequeña (20px)</SelectItem>
-                    <SelectItem value="medium">Mediana (30px)</SelectItem>
-                    <SelectItem value="large">Grande (40px)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-[var(--color-text-muted)] mt-2">
-                  La altura se aplica a cada intervalo de tiempo en el calendario.
-                </p>
+              <div className="space-y-6 py-6">
+                {/* Slot Height Configuration */}
+                <div>
+                  <label className="text-sm font-medium text-[var(--color-text-primary)] mb-2 block">
+                    Altura de las celdas
+                  </label>
+                  <Select value={slotHeight} onValueChange={(value: string) => setSlotHeight(value as 'small' | 'medium' | 'large')}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="small">Pequeña (20px)</SelectItem>
+                      <SelectItem value="medium">Mediana (30px)</SelectItem>
+                      <SelectItem value="large">Grande (40px)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-[var(--color-text-muted)] mt-2">
+                    La altura se aplica a cada intervalo de tiempo en el calendario.
+                  </p>
+                </div>
+
+                {/* Working Hours Configuration */}
+                <div className="border-t border-[var(--color-border)] pt-6">
+                  <label className="text-sm font-medium text-[var(--color-text-primary)] mb-4 block">
+                    Horario de Atención
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="start-hour" className="text-xs text-[var(--color-text-secondary)] mb-2 block">
+                        Hora de Inicio
+                      </label>
+                      <Select
+                        value={localStartHour.toString()}
+                        onValueChange={(value) => setLocalStartHour(parseInt(value))}
+                      >
+                        <SelectTrigger id="start-hour" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: MAX_HOUR }, (_, i) => (
+                            <SelectItem key={i} value={i.toString()}>
+                              {i.toString().padStart(2, '0')}:00
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label htmlFor="end-hour" className="text-xs text-[var(--color-text-secondary)] mb-2 block">
+                        Hora de Fin
+                      </label>
+                      <Select
+                        value={localEndHour.toString()}
+                        onValueChange={(value) => setLocalEndHour(parseInt(value))}
+                      >
+                        <SelectTrigger id="end-hour" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: MAX_HOUR + 1 }, (_, i) => (
+                            <SelectItem key={i} value={i.toString()}>
+                              {i.toString().padStart(2, '0')}:00
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {localStartHour >= localEndHour && (
+                    <p className="text-xs text-[var(--color-error)] mt-2">
+                      La hora de inicio debe ser anterior a la hora de fin.
+                    </p>
+                  )}
+                  <p className="text-xs text-[var(--color-text-muted)] mt-2">
+                    El calendario mostrará solo los horarios dentro de este rango.
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-[var(--color-border)]">
+                <Button variant="outline" onClick={() => setIsConfigOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleApplyWorkingHours}
+                  disabled={localStartHour >= localEndHour}
+                >
+                  Aplicar Cambios
+                </Button>
               </div>
             </DialogContent>
           </Dialog>

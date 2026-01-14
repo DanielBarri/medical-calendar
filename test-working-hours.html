@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Working Hours Logic Test</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .test-group {
+      margin: 20px 0;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    .test-case {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px;
+      margin: 4px 0;
+      border-radius: 4px;
+    }
+    .test-case.pass {
+      background-color: #d1fae5;
+      border: 1px solid #10b981;
+    }
+    .test-case.fail {
+      background-color: #fee2e2;
+      border: 1px solid #ef4444;
+    }
+    .result {
+      font-weight: bold;
+    }
+    .result.pass { color: #10b981; }
+    .result.fail { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>Working Hours Logic Test</h1>
+  <p>Testing the <code>isWithinWorkingHours</code> logic with default hours: 8am - 6pm (8-18)</p>
+
+  <div id="test-results"></div>
+
+  <script>
+    // Replicate the logic from the components
+    function isWithinWorkingHours(hour, workingHours) {
+      if (!workingHours) return true;
+      return hour >= workingHours.startHour && hour < workingHours.endHour;
+    }
+
+    const workingHours = { startHour: 8, endHour: 18 };
+
+    const testCases = [
+      // Before working hours
+      { hour: 0, expected: false, description: 'Midnight (00:00)' },
+      { hour: 1, expected: false, description: '1am' },
+      { hour: 7, expected: false, description: '7am (before start)' },
+
+      // Boundary: Start of working hours
+      { hour: 8, expected: true, description: '8am (exact start)' },
+      { hour: 9, expected: true, description: '9am' },
+
+      // During working hours
+      { hour: 10, expected: true, description: '10am' },
+      { hour: 12, expected: true, description: 'Noon (12:00)' },
+      { hour: 14, expected: true, description: '2pm' },
+      { hour: 17, expected: true, description: '5pm (last working hour)' },
+
+      // Boundary: End of working hours
+      { hour: 18, expected: false, description: '6pm (exact end - should be closed)' },
+
+      // After working hours
+      { hour: 19, expected: false, description: '7pm' },
+      { hour: 22, expected: false, description: '10pm' },
+      { hour: 23, expected: false, description: '11pm' },
+    ];
+
+    const resultsContainer = document.getElementById('test-results');
+    let passCount = 0;
+    let failCount = 0;
+
+    // Test with working hours
+    const withHoursGroup = document.createElement('div');
+    withHoursGroup.className = 'test-group';
+    withHoursGroup.innerHTML = '<h2>With Working Hours (8am - 6pm)</h2>';
+
+    testCases.forEach(test => {
+      const actual = isWithinWorkingHours(test.hour, workingHours);
+      const passed = actual === test.expected;
+
+      if (passed) passCount++;
+      else failCount++;
+
+      const testDiv = document.createElement('div');
+      testDiv.className = `test-case ${passed ? 'pass' : 'fail'}`;
+      testDiv.innerHTML = `
+        <span>${test.description} (hour: ${test.hour})</span>
+        <span class="result ${passed ? 'pass' : 'fail'}">
+          Expected: ${test.expected ? 'WORKING' : 'CLOSED'} |
+          Got: ${actual ? 'WORKING' : 'CLOSED'} |
+          ${passed ? '✓ PASS' : '✗ FAIL'}
+        </span>
+      `;
+      withHoursGroup.appendChild(testDiv);
+    });
+
+    resultsContainer.appendChild(withHoursGroup);
+
+    // Test without working hours (should all be working)
+    const withoutHoursGroup = document.createElement('div');
+    withoutHoursGroup.className = 'test-group';
+    withoutHoursGroup.innerHTML = '<h2>Without Working Hours (undefined)</h2>';
+
+    [0, 8, 12, 18, 23].forEach(hour => {
+      const actual = isWithinWorkingHours(hour, null);
+      const expected = true;
+      const passed = actual === expected;
+
+      const testDiv = document.createElement('div');
+      testDiv.className = `test-case ${passed ? 'pass' : 'fail'}`;
+      testDiv.innerHTML = `
+        <span>Hour ${hour}</span>
+        <span class="result ${passed ? 'pass' : 'fail'}">
+          ${passed ? '✓ PASS (all hours working)' : '✗ FAIL'}
+        </span>
+      `;
+      withoutHoursGroup.appendChild(testDiv);
+    });
+
+    resultsContainer.appendChild(withoutHoursGroup);
+
+    // Summary
+    const summary = document.createElement('div');
+    summary.className = 'test-group';
+    summary.innerHTML = `
+      <h2>Summary</h2>
+      <p><strong>Total Tests:</strong> ${passCount + failCount}</p>
+      <p style="color: #10b981;"><strong>Passed:</strong> ${passCount}</p>
+      <p style="color: #ef4444;"><strong>Failed:</strong> ${failCount}</p>
+      <p><strong>Result:</strong> ${failCount === 0 ? '✓ All tests passed!' : '✗ Some tests failed'}</p>
+    `;
+    resultsContainer.appendChild(summary);
+  </script>
+</body>
+</html>
