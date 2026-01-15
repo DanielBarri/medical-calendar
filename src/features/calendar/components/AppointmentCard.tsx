@@ -26,6 +26,8 @@ import {
   getTypeColor,
   getAppointmentTypeLabel,
 } from '../utils/appointmentHelpers';
+import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 
 /**
  * Props for the AppointmentCard component
@@ -84,6 +86,28 @@ const AppointmentCard = memo(function AppointmentCard({
   totalOverlapping = 1,
   onClick,
 }: AppointmentCardProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: appointment.id,
+    data: { appointment, type: 'appointment' },
+  });
+
+  const {
+    attributes: resizeAttributes,
+    listeners: resizeListeners,
+    setNodeRef: setResizeRef,
+    transform: resizeTransform,
+    isDragging: isResizing,
+  } = useDraggable({
+    id: `resize-${appointment.id}`,
+    data: { appointment, type: 'resize' },
+  });
+
+  const draggingStyle = transform ? {
+    transform: CSS.Translate.toString(transform),
+    opacity: 0.8,
+    zIndex: 1000,
+  } : undefined;
+
   /**
    * Memoized position calculations for performance
    */
@@ -103,6 +127,12 @@ const AppointmentCard = memo(function AppointmentCard({
     };
   }, [appointment, slotHeightPx, slotInterval, offsetIndex, totalOverlapping]);
 
+  // Calculate dynamic styles for resizing
+  const resizeStyle = isResizing && resizeTransform ? {
+    height: `calc(${height} + ${resizeTransform.y}px)`,
+    zIndex: 1000, // Keep above other things while resizing
+  } : {};
+
   /**
    * Memoized time range string
    */
@@ -110,6 +140,9 @@ const AppointmentCard = memo(function AppointmentCard({
     () => formatTimeRange(appointment.startTime, appointment.endTime),
     [appointment.startTime, appointment.endTime]
   );
+
+  // Update displayed time range during resize?
+  // Ideally yes, but complex. Let's start with visual height.
 
   /**
    * Handle click event
@@ -128,23 +161,45 @@ const AppointmentCard = memo(function AppointmentCard({
     }
   };
 
+  // Calculate final width string for CSS variable
+  const finalWidth = totalOverlapping > 1 ? `calc(${width} - var(--overlap-offset))` : width;
+
   return (
     <div
-      className="absolute px-[var(--spacing-sm)] py-[var(--spacing-xs)] rounded-[var(--radius-sm)] shadow-[var(--shadow-sm)] cursor-pointer transition-all duration-[var(--transition-fast)] hover:shadow-[var(--shadow-md)] hover:z-[calc(var(--z-base)+1)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:z-[calc(var(--z-base)+1)] overflow-hidden border-l-[var(--appointment-border-width)] border-solid max-md:px-[var(--spacing-xs)] max-md:py-[4px]"
+      className={`absolute px-[var(--spacing-sm)] py-[var(--spacing-xs)] rounded-[var(--radius-sm)] shadow-[var(--shadow-sm)] cursor-pointer transition-all duration-[var(--transition-fast)] hover:shadow-[var(--shadow-md)] hover:z-[calc(var(--z-base)+1)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:z-[calc(var(--z-base)+1)] overflow-hidden border-l-[var(--appointment-border-width)] border-solid max-md:px-[var(--spacing-xs)] max-md:py-[4px] ${isDragging ? 'z-[9999] shadow-xl ring-2 ring-[var(--color-primary)]' : ''} w-[var(--card-width)] hover:w-[calc(var(--card-width)-15px)] delay-500 hover:delay-0`}
+      ref={setNodeRef}
       style={{
+        ...draggingStyle,
+        ...resizeStyle,
         top,
-        height,
+        height: resizeStyle.height || height, // Override height if resizing
         left,
-        width: totalOverlapping > 1 ? `calc(${width} - var(--overlap-offset))` : width,
+        '--card-width': finalWidth,
         backgroundColor: getStatusColor(appointment.status, 'light'),
         borderLeftColor: getTypeColor(appointment.type, 'main'),
-      }}
+      } as any}
+      {...listeners}
+      {...attributes}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       role="button"
       tabIndex={0}
       aria-label={`Cita con ${appointment.patientName}, ${timeRange}, ${getAppointmentTypeLabel(appointment.type)}`}
     >
+      {/* Resize Handle */}
+      {/* We stop propagation on pointer down so the card drag doesn't start if we catch the handle */}
+      <div
+        ref={setResizeRef}
+        {...resizeListeners}
+        {...resizeAttributes}
+        className={`absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize z-50 hover:bg-[var(--color-primary)] hover:opacity-50 transition-opacity ${isResizing ? 'bg-[var(--color-primary)] opacity-50' : 'opacity-0'}`}
+        onPointerDown={(e) => {
+          resizeListeners?.onPointerDown?.(e);
+          e.stopPropagation();
+        }}
+        title="Arrastrar para cambiar duración"
+      />
+
       {/* Patient Name */}
       <div
         className="text-[var(--font-size-sm)] font-[var(--font-weight-semibold)] leading-[var(--line-height-tight)] mb-[2px] truncate max-lg:text-[var(--font-size-xs)] max-md:text-[11px]"

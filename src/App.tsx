@@ -1,38 +1,28 @@
-/**
- * App Component
- *
- * Main application component for the Medical Calendar.
- * Renders the Calendar component with default configuration.
- */
-
-import Calendar from './components/Calendar';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import MainLayout from './layouts/MainLayout';
+import CalendarPage from './pages/CalendarPage';
+import DashboardPage from './pages/DashboardPage';
+import PatientsPage from './pages/PatientsPage';
+import SettingsPage from './pages/SettingsPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
 function App() {
-  /**
-   * Handle date change events from the Calendar
-   */
-  const handleDateChange = () => {
-    // Handle date change logic here
-  };
-
-  /**
-   * Handle view change events from the Calendar
-   */
-  const handleViewChange = () => {
-    // Handle view change logic here
-  };
-
   return (
-    <div className="app">
+    <BrowserRouter>
       <ErrorBoundary>
-        <Calendar
-          onDateChange={handleDateChange}
-          onViewChange={handleViewChange}
-        />
+        <Routes>
+          <Route path="/" element={<MainLayout />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="calendar" element={<CalendarPage />} />
+            <Route path="patients" element={<PatientsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            {/* Catch all - redirect to dashboard */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
       </ErrorBoundary>
-    </div>
+    </BrowserRouter>
   );
 }
 

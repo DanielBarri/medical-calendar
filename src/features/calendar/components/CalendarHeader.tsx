@@ -25,15 +25,15 @@ import {
   navigateNext,
   getToday,
   checkIsToday,
-} from '../utils/dateHelpers';
+} from '../../../utils/dateHelpers';
 import { useWorkingHoursContext } from '../hooks/useWorkingHoursContext';
-import { MAX_HOUR } from '../constants/calendar';
-import { Button } from './ui/button';
-import { Calendar } from './ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { cn } from '@/lib/utils';
+import { MAX_HOUR } from '../../../constants/calendar';
+import { Button } from '../../../components/ui/button';
+import { Calendar } from '../../../components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '../../../components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../../../components/ui/dialog';
+import { cn } from '../../../lib/utils';
 
 /**
  * Screen reader only utility class
@@ -45,6 +45,8 @@ export default function CalendarHeader({
   view,
   onDateChange,
   onViewChange,
+  slotHeight,
+  onSlotHeightChange,
 }: CalendarHeaderProps) {
   /**
    * Access working hours from context
@@ -61,36 +63,28 @@ export default function CalendarHeader({
    */
   const [isConfigOpen, setIsConfigOpen] = useState(false);
 
-  /**
-   * State for slot height selection
-   */
-  const [slotHeight, setSlotHeight] = useState<'small' | 'medium' | 'large'>('medium');
+
 
   /**
    * Local state for working hours (synced with context via apply button)
    */
   const [localStartHour, setLocalStartHour] = useState(workingHours.startHour);
   const [localEndHour, setLocalEndHour] = useState(workingHours.endHour);
+  const [localSlotHeight, setLocalSlotHeight] = useState(slotHeight);
 
   /**
-   * Sync local state when context working hours change
+   * Sync local state when context/props change
    */
   useEffect(() => {
     setLocalStartHour(workingHours.startHour);
     setLocalEndHour(workingHours.endHour);
   }, [workingHours]);
 
-  /**
-   * Update CSS variable when slot height changes
-   */
   useEffect(() => {
-    const heightMap = {
-      small: 'var(--slot-height-small)',
-      medium: 'var(--slot-height-medium)',
-      large: 'var(--slot-height-large)',
-    };
-    document.documentElement.style.setProperty('--slot-height', heightMap[slotHeight]);
+    setLocalSlotHeight(slotHeight);
   }, [slotHeight]);
+
+
 
   /**
    * Memoized expensive computations
@@ -155,6 +149,7 @@ export default function CalendarHeader({
       return;
     }
     setWorkingHours({ startHour: localStartHour, endHour: localEndHour });
+    onSlotHeightChange(localSlotHeight);
     setIsConfigOpen(false);
   }, [localStartHour, localEndHour, setWorkingHours]);
 
@@ -166,9 +161,9 @@ export default function CalendarHeader({
     >
       <div className="flex items-center justify-between w-full px-[var(--spacing-xl)] gap-[var(--spacing-lg)] max-w-full max-lg:px-[var(--spacing-lg)] max-lg:gap-[var(--spacing-md)] max-md:flex-col max-md:items-stretch max-md:p-[var(--spacing-md)] max-md:gap-[var(--spacing-md)]">
         {/* Left Section: Navigation and Date Display */}
-        <div className="flex items-center gap-[var(--spacing-md)] flex-1 min-w-0 max-md:grid max-md:grid-cols-[auto_1fr_auto] max-md:grid-rows-[auto_auto] max-md:gap-[var(--spacing-sm)] max-md:items-center">
+        <div className="flex items-center gap-[var(--spacing-md)] flex-1 min-w-0 max-md:justify-between max-md:w-full">
           {/* Navigation Buttons */}
-          <div className="flex items-center gap-[var(--spacing-sm)] max-md:col-start-1 max-md:row-start-1 max-md:justify-start">
+          <div className="flex items-center gap-[var(--spacing-sm)] flex-shrink-0">
             <Button
               onClick={handlePrevious}
               variant="outline"
@@ -221,65 +216,66 @@ export default function CalendarHeader({
           </div>
 
           {/* Date Display - Enhanced with better visual hierarchy */}
-          <div className="flex items-center min-w-0 px-[var(--spacing-sm)] max-md:col-start-1 max-md:col-end-4 max-md:row-start-2 max-md:justify-center max-md:px-0">
-            <h1 className="text-[var(--font-size-xl)] font-[var(--font-weight-semibold)] text-[var(--color-text-primary)] m-0 whitespace-nowrap overflow-hidden text-ellipsis leading-[var(--line-height-tight)] capitalize tracking-[-0.01em] max-lg:text-[var(--font-size-lg)] max-md:text-center max-[480px]:text-[var(--font-size-base)]">
+          <div className="flex items-center min-w-0 px-[var(--spacing-sm)] overflow-hidden max-md:justify-center max-md:flex-1">
+            <h1 className="text-[var(--font-size-xl)] font-[var(--font-weight-semibold)] text-[var(--color-text-primary)] m-0 whitespace-nowrap overflow-hidden text-ellipsis leading-[var(--line-height-tight)] capitalize tracking-[-0.01em] max-lg:text-[var(--font-size-lg)] max-md:text-[var(--font-size-base)]">
               {formattedDate}
             </h1>
           </div>
 
-          {/* Today Button */}
-          <Button
-            onClick={handleToday}
-            variant={isCurrentDateToday ? "default" : "outline"}
-            className={cn(
-              "max-md:col-start-2 max-md:row-start-1 max-md:flex-1",
-              isCurrentDateToday && "opacity-60 cursor-default"
-            )}
-            disabled={isCurrentDateToday}
-            aria-label="Ir a hoy"
-            title="Hoy"
-          >
-            Hoy
-          </Button>
+          <div className="flex items-center gap-[var(--spacing-sm)] flex-shrink-0">
+            {/* Today Button */}
+            <Button
+              onClick={handleToday}
+              variant={isCurrentDateToday ? "default" : "outline"}
+              className={cn(
+                isCurrentDateToday && "opacity-60 cursor-default"
+              )}
+              disabled={isCurrentDateToday}
+              aria-label="Ir a hoy"
+              title="Hoy"
+            >
+              Hoy
+            </Button>
 
-          {/* Date Picker with Calendar Popover */}
-          <div className="max-md:col-start-3 max-md:row-start-1">
-            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Seleccionar fecha"
-                  title="Seleccionar fecha"
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    aria-hidden="true"
+            {/* Date Picker with Calendar Popover */}
+            <div className="">
+              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label="Seleccionar fecha"
+                    title="Seleccionar fecha"
                   >
-                    <path
-                      d="M6 2V4M14 2V4M3 8H17M5 4H15C16.1046 4 17 4.89543 17 6V16C17 17.1046 16.1046 18 15 18H5C3.89543 18 3 17.1046 3 16V6C3 4.89543 3.89543 4 5 4Z"
-                      stroke="currentColor"
-                      strokeWidth="1.75"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 overflow-hidden" align="start">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={handleCalendarSelect}
-                  today={new Date()}
-                  autoFocus
-                />
-              </PopoverContent>
-            </Popover>
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M6 2V4M14 2V4M3 8H17M5 4H15C16.1046 4 17 4.89543 17 6V16C17 17.1046 16.1046 18 15 18H5C3.89543 18 3 17.1046 3 16V6C3 4.89543 3.89543 4 5 4Z"
+                        stroke="currentColor"
+                        strokeWidth="1.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 overflow-hidden" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleCalendarSelect}
+                    today={new Date()}
+                    autoFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         </div>
 
@@ -332,7 +328,7 @@ export default function CalendarHeader({
                   <label className="text-sm font-medium text-[var(--color-text-primary)] mb-2 block">
                     Altura de las celdas
                   </label>
-                  <Select value={slotHeight} onValueChange={(value: string) => setSlotHeight(value as 'small' | 'medium' | 'large')}>
+                  <Select value={localSlotHeight} onValueChange={(value: string) => setLocalSlotHeight(value as 'small' | 'medium' | 'large')}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>

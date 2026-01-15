@@ -31,6 +31,8 @@ export interface CalendarHeaderProps {
    * Callback fired when the view mode changes
    */
   onViewChange: (view: CalendarView) => void;
+  slotHeight: 'small' | 'medium' | 'large';
+  onSlotHeightChange: (height: 'small' | 'medium' | 'large') => void;
 }
 
 /**

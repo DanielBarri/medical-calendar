@@ -20,7 +20,7 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Appointment } from '../types/appointment';
-import { MIN_APPOINTMENT_HEIGHT, MINUTES_IN_HOUR } from '../constants/calendar';
+import { MIN_APPOINTMENT_HEIGHT, MINUTES_IN_HOUR } from '../../../constants/calendar';
 
 /**
  * Calculate the top position of an appointment in pixels

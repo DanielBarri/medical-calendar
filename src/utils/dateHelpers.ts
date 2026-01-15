@@ -35,7 +35,7 @@ import {
   getYear,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import type { CalendarView } from '../types/calendar';
+import type { CalendarView } from '../features/calendar/types/calendar';
 
 /**
  * Format a date for display in the calendar header

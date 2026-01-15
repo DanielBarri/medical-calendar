@@ -12,17 +12,21 @@
  * @component
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import CalendarHeader from './CalendarHeader';
 import CalendarTimeline from './CalendarTimeline';
 import CalendarGrid from './CalendarGrid';
-import QuickAppointmentModal from './QuickAppointmentModal';
+import AppointmentModal from './AppointmentModal';
 import { WorkingHoursProvider } from '../contexts/WorkingHoursContext';
 import type { CalendarView } from '../types/calendar';
-import type { Appointment, AppointmentType } from '../types/appointment';
-import { getToday } from '../utils/dateHelpers';
-import { addMinutes } from 'date-fns';
-import { MIN_HOUR, MAX_HOUR } from '../constants/calendar';
+import type { Appointment } from '../types/appointment';
+import type { AppointmentFormData } from '../../../schemas/appointmentSchema';
+import { getToday } from '../../../utils/dateHelpers';
+import { MIN_HOUR, MAX_HOUR } from '../../../constants/calendar';
+import { DndContext } from '@dnd-kit/core';
+import { useCalendarState } from '../hooks/useCalendarState';
+import { useAppointments } from '../hooks/useAppointments';
+import { useCalendarDrag } from '../hooks/useCalendarDrag';
 
 /**
  * Generate mock appointments for testing
@@ -235,19 +239,43 @@ export default function Calendar({
   onDateChange,
   onViewChange,
 }: CalendarProps) {
-  // State management for calendar
-  const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
-  const [view, setView] = useState<CalendarView>(initialView);
+  // State management for calendar view and date
+  const {
+    selectedDate,
+    view,
+    slotHeight,
+    slotHeightPx,
+    setSlotHeight,
+    handleDateChange,
+    handleViewChange,
+  } = useCalendarState({
+    initialDate,
+    initialView,
+    onDateChange,
+    onViewChange,
+  });
 
-  // Start with empty appointments array
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  // State management for appointments
+  const {
+    appointments,
+    setAppointments, // Exposed for Drag&Drop
+    addAppointment,
+    updateAppointmentFromForm,
+    deleteAppointment,
+  } = useAppointments();
+
+
 
   /**
-   * State for quick appointment creation modal
-   * Combines date selection and modal open state to prevent race conditions
-   * null = modal closed, Date = modal open with selected time
+   * State for appointment modal (create/edit)
    */
-  const [quickCreateSlot, setQuickCreateSlot] = useState<Date | null>(null);
+  const [modalState, setModalState] = useState<{
+    mode: 'create';
+    date: Date;
+  } | {
+    mode: 'edit';
+    appointment: Appointment;
+  } | null>(null);
 
   // Refs for scroll synchronization
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -255,8 +283,9 @@ export default function Calendar({
 
   /**
    * Synchronize scroll between timeline and grid
+   * Uses useLayoutEffect to ensure DOM elements are ready
    */
-  useEffect(() => {
+  useLayoutEffect(() => {
     const gridElement = gridRef.current;
     const timelineElement = timelineRef.current;
 
@@ -276,28 +305,45 @@ export default function Calendar({
   }, []);
 
   /**
-   * Handle date change from child components
+   * Auto-scroll to current time on mount
+   * Centralized here to ensure both grid and timeline are synced
    */
-  const handleDateChange = (date: Date) => {
-    setSelectedDate(date);
-    onDateChange?.(date);
-  };
+  useEffect(() => {
+    // Small delay to ensure layout is stable
+    const timer = setTimeout(() => {
+      if (gridRef.current && timelineRef.current) {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
 
-  /**
-   * Handle view change from child components
-   */
-  const handleViewChange = (newView: CalendarView) => {
-    setView(newView);
-    onViewChange?.(newView);
-  };
+        // Calculate minutes from start of day (relative to MIN_HOUR)
+        const minutesFromStart = (currentHour - MIN_HOUR) * 60 + currentMinute;
+
+        if (minutesFromStart > 0) {
+          const slotInterval = 30; // Hardcoded matching the props passed below
+          const pixelsPerMinute = slotHeightPx / slotInterval;
+          const scrollPosition = minutesFromStart * pixelsPerMinute;
+
+          // Center in viewport
+          const viewportHeight = gridRef.current.clientHeight;
+          const centeredPosition = Math.max(0, scrollPosition - (viewportHeight / 2));
+
+          // Scroll BOTH to ensure sync
+          gridRef.current.scrollTop = centeredPosition;
+          timelineRef.current.scrollTop = centeredPosition;
+        }
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   /**
    * Handle appointment click
    * TODO: Open appointment detail modal in future sprint
    */
   const handleAppointmentClick = (appointment: Appointment) => {
-    console.log('Appointment clicked:', appointment);
-    // Future: Open modal with appointment details
+    setModalState({ mode: 'edit', appointment });
   };
 
   /**
@@ -309,96 +355,94 @@ export default function Calendar({
   const handleSlotClick = (date: Date, hour: number, minute: number) => {
     const slotDateTime = new Date(date);
     slotDateTime.setHours(hour, minute, 0, 0);
-    // Atomically set both the slot time and open the modal
-    setQuickCreateSlot(slotDateTime);
+    // Atomically set state to open "create" modal
+    setModalState({ mode: 'create', date: slotDateTime });
   };
 
   /**
-   * Handle quick appointment creation
-   *
-   * TIMEZONE NOTE: Appointment times are stored as Date objects in local timezone.
-   * When implementing backend integration:
-   * - Convert startTime and endTime to UTC before sending to API
-   * - Store timezone information with the appointment
-   * - Convert back to office timezone when displaying
+   * Handle appointment save (create or update)
    */
-  const handleQuickCreate = (data: {
-    patientName: string;
-    startTime: Date;
-    duration: number;
-    type: AppointmentType;
-    isNewPatient: boolean;
-  }) => {
-    // Calculate end time
-    const endTime = addMinutes(data.startTime, data.duration);
-
-    // Create new appointment with default 'booked' status
-    const newAppointment: Appointment = {
-      id: `apt-${Date.now()}`, // Simple ID generation for demo
-      patientName: data.patientName,
-      startTime: data.startTime,
-      endTime,
-      duration: data.duration,
-      type: data.type,
-      status: 'booked', // Default status for new appointments
-      isNewPatient: data.isNewPatient,
-    };
-
-    // Add to appointments list
-    setAppointments((prev) => [...prev, newAppointment]);
-
-    console.log('New appointment created:', newAppointment);
+  const handleSaveAppointment = (data: AppointmentFormData) => {
+    if (modalState?.mode === 'edit') {
+      updateAppointmentFromForm(modalState.appointment.id, data);
+    } else {
+      addAppointment(data);
+    }
   };
 
+  /**
+   * Handle appointment deletion
+   */
+  const handleDeleteAppointment = () => {
+    if (modalState?.mode === 'edit') {
+      deleteAppointment(modalState.appointment.id);
+    }
+  };
+
+  // Drag & Drop logic
+  const { sensors, handleDragEnd } = useCalendarDrag({
+    setAppointments,
+    slotHeightPx,
+  });
+
   return (
-    <WorkingHoursProvider>
-      <div
-        className="flex flex-col h-screen w-full overflow-hidden bg-[var(--color-background)]"
-        role="application"
-        aria-label="Calendario médico"
-      >
-        {/* Calendar Header - Navigation and controls */}
-        <CalendarHeader
-          selectedDate={selectedDate}
-          view={view}
-          onDateChange={handleDateChange}
-          onViewChange={handleViewChange}
-        />
-
-        {/* Main Calendar Content - Scroll synchronized container */}
-        <div className="flex flex-1 overflow-hidden relative bg-[var(--color-background)]">
-          {/* Timeline - Vertical time slots (left side, sticky) */}
-          <CalendarTimeline
-            slotInterval={30}
-            scrollRef={timelineRef}
-            startHour={MIN_HOUR}
-            endHour={MAX_HOUR}
-          />
-
-          {/* Grid - Appointment columns (right side, scrollable) */}
-          <CalendarGrid
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <WorkingHoursProvider>
+        <div
+          className="flex flex-col h-screen w-full overflow-hidden bg-[var(--color-background)]"
+          role="application"
+          aria-label="Calendario médico"
+        >
+          {/* Calendar Header - Navigation and controls */}
+          <CalendarHeader
             selectedDate={selectedDate}
             view={view}
-            slotInterval={30}
-            scrollRef={gridRef}
-            appointments={appointments}
-            onAppointmentClick={handleAppointmentClick}
-            onSlotClick={handleSlotClick}
-            startHour={MIN_HOUR}
-            endHour={MAX_HOUR}
+            onDateChange={handleDateChange}
+            onViewChange={handleViewChange}
+            slotHeight={slotHeight}
+            onSlotHeightChange={setSlotHeight}
+          />
+
+          {/* Main Calendar Content - Scroll synchronized container */}
+          <div className="flex flex-1 overflow-hidden relative bg-[var(--color-background)]">
+            {/* Timeline - Vertical time slots (left side, sticky) */}
+            <CalendarTimeline
+              slotInterval={30}
+              scrollRef={timelineRef}
+              startHour={MIN_HOUR}
+              endHour={MAX_HOUR}
+            />
+
+            {/* Grid - Appointment columns (right side, scrollable) */}
+            <CalendarGrid
+              selectedDate={selectedDate}
+              view={view}
+              slotInterval={30}
+              scrollRef={gridRef}
+              appointments={appointments}
+              onAppointmentClick={handleAppointmentClick}
+              onSlotClick={handleSlotClick}
+              startHour={MIN_HOUR}
+              endHour={MAX_HOUR}
+              slotHeightPx={slotHeightPx}
+            />
+          </div>
+
+          {/* Appointment Modal (Create & Edit) */}
+          <AppointmentModal
+            isOpen={!!modalState}
+            onClose={() => setModalState(null)}
+            selectedDate={modalState?.mode === 'create' ? modalState.date : undefined}
+            initialData={modalState?.mode === 'edit' ? modalState.appointment : undefined}
+            onSubmit={async (data) => handleSaveAppointment(data)}
+            onDelete={
+              modalState?.mode === 'edit'
+                ? async () => handleDeleteAppointment()
+                : undefined
+            }
           />
         </div>
-
-        {/* Quick Appointment Creation Modal */}
-        {quickCreateSlot && (
-          <QuickAppointmentModal
-            isOpen={true}
-            onClose={() => setQuickCreateSlot(null)}
-            selectedDateTime={quickCreateSlot}
-            onCreate={handleQuickCreate}
-          />
-        )}
-      </div>
-    </WorkingHoursProvider>
+      </WorkingHoursProvider>
+    </DndContext>
   );
 }

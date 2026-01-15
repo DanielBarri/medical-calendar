@@ -15,9 +15,9 @@
  * @component
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useWorkingHoursContext } from '../hooks/useWorkingHoursContext';
-import { MINUTES_IN_HOUR } from '../constants/calendar';
+import { MINUTES_IN_HOUR } from '../../../constants/calendar';
 
 /**
  * Interface for a time slot
@@ -143,6 +143,46 @@ export default function CalendarTimeline({
   endHour = 24,
   scrollRef,
 }: CalendarTimelineProps) {
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Update current time every minute
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000); // 1 min
+    return () => clearInterval(timer);
+  }, []);
+
+  /**
+   * Auto-scroll to current time on mount
+   */
+  useEffect(() => {
+    if (scrollRef?.current) {
+      const currentHour = currentTime.getHours();
+      const currentMinute = currentTime.getMinutes();
+
+      // Calculate minutes from start of day (relative to startHour)
+      const minutesFromStart = (currentHour - startHour) * 60 + currentMinute;
+
+      // Don't scroll if before start time
+      if (minutesFromStart < 0) return;
+
+      // Calculate pixel offset
+      // This assumes slot height is roughly consistent. 
+      // For a perfect calculation we'd need the exact slot height px, 
+      // but an estimate works for "center in view" logic.
+      // We can grab the CSS variable or just estimate based on default.
+      const slotHeightEstimate = 60; // Default height for 30min slot (2 * 30px)
+      const pixelsPerMinute = slotHeightEstimate / slotInterval; // e.g. 60px / 30min = 2px/min
+
+      const scrollPosition = minutesFromStart * pixelsPerMinute;
+
+      // Center the time in the viewport
+      const viewportHeight = scrollRef.current.clientHeight;
+      const centeredPosition = scrollPosition - (viewportHeight / 2);
+
+      scrollRef.current.scrollTop = Math.max(0, centeredPosition);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
   /**
    * Access working hours from context
    */
@@ -171,13 +211,35 @@ export default function CalendarTimeline({
     >
       <div className="relative">
         {/* Spacer to align with grid column headers */}
-        <div className="sticky top-0 z-[var(--z-sticky)] bg-[var(--color-surface)] border-b-2 border-[var(--color-border)] p-[var(--spacing-md)] flex items-center gap-[var(--spacing-sm)] max-lg:p-[var(--spacing-sm)] max-md:p-[var(--spacing-sm)] max-md:px-[var(--spacing-xs)] max-md:gap-[var(--spacing-xs)] max-[480px]:p-[var(--spacing-xs)]">
-          {/* Empty spacer with same height as grid headers - horizontal layout */}
-          <div className="text-[var(--font-size-sm)] font-[var(--font-weight-semibold)] leading-[var(--line-height-tight)] max-lg:text-[var(--font-size-xs)] max-md:text-[11px] opacity-0">
-            Día
+        <div className="sticky top-0 z-[var(--z-sticky)] bg-[var(--color-surface)] border-b-2 border-[var(--color-border)] p-[var(--spacing-md)] flex items-center justify-center gap-[var(--spacing-sm)] max-lg:p-[var(--spacing-sm)] max-md:p-[var(--spacing-sm)] max-md:px-[var(--spacing-xs)] max-md:gap-[var(--spacing-xs)] max-[480px]:p-[var(--spacing-xs)]">
+          {/* Desktop (lg+): Horizontal layout */}
+          <div className="hidden lg:flex items-center gap-[var(--spacing-sm)] opacity-0">
+            <div className="text-[var(--font-size-sm)] font-[var(--font-weight-semibold)] leading-[var(--line-height-tight)]">
+              Día
+            </div>
+            <div className="text-[var(--font-size-sm)] font-[var(--font-weight-semibold)] leading-[var(--line-height-tight)] w-[36px] h-[36px] flex items-center justify-center">
+              13
+            </div>
           </div>
-          <div className="text-[var(--font-size-sm)] font-[var(--font-weight-semibold)] leading-[var(--line-height-tight)] max-lg:text-[var(--font-size-xs)] max-md:text-[11px] w-[36px] h-[36px] max-lg:w-[32px] max-lg:h-[32px] max-md:w-[28px] max-md:h-[28px] opacity-0">
-            13
+
+          {/* Tablet (md-lg): Vertical stack */}
+          <div className="hidden md:flex lg:hidden flex-col items-center gap-1 opacity-0">
+            <div className="text-[var(--font-size-xs)] font-[var(--font-weight-semibold)] leading-[var(--line-height-tight)]">
+              Día
+            </div>
+            <div className="text-[var(--font-size-xs)] font-[var(--font-weight-semibold)] leading-[var(--line-height-tight)] w-[32px] h-[32px] flex items-center justify-center">
+              13
+            </div>
+          </div>
+
+          {/* Mobile (<md): Abbreviated vertical */}
+          <div className="flex md:hidden flex-col items-center gap-1 opacity-0">
+            <div className="text-[11px] font-[var(--font-weight-semibold)] leading-[var(--line-height-tight)]">
+              Día
+            </div>
+            <div className="text-[11px] font-[var(--font-weight-semibold)] leading-[var(--line-height-tight)] w-[28px] h-[28px] flex items-center justify-center">
+              13
+            </div>
           </div>
         </div>
 
@@ -188,11 +250,10 @@ export default function CalendarTimeline({
             return (
               <div
                 key={`${slot.hour}-${slot.minute}`}
-                className={`relative flex items-start justify-end pr-[var(--spacing-sm)] pt-[calc(var(--spacing-xs)/2)] border-t max-md:pr-[var(--spacing-xs)] ${
-                  slot.isHourStart
-                    ? 'border-[var(--grid-line-bold)]'
-                    : 'border-[var(--grid-line-color)]'
-                } ${index === 0 ? 'border-t-0' : ''} ${!isWorking ? 'opacity-50' : ''}`}
+                className={`relative flex items-start justify-end pr-[var(--spacing-sm)] pt-[calc(var(--spacing-xs)/2)] border-t max-md:pr-[var(--spacing-xs)] ${slot.isHourStart
+                  ? 'border-[var(--grid-line-bold)]'
+                  : 'border-[var(--grid-line-color)]'
+                  } ${index === 0 ? 'border-t-0' : ''} ${!isWorking ? 'opacity-50' : ''}`}
                 style={{
                   height: 'var(--slot-height)',
                   ...((!isWorking) && {
@@ -205,9 +266,8 @@ export default function CalendarTimeline({
                 {/* Only show label for hour starts to reduce clutter */}
                 {slot.isHourStart && (
                   <span
-                    className={`text-[var(--font-size-xs)] font-[var(--font-weight-medium)] leading-[var(--line-height-tight)] select-none max-lg:text-[10px] max-md:text-[9px] -translate-y-[calc(var(--spacing-xs)/2)] ${
-                      isWorking ? 'text-[var(--color-text-secondary)]' : 'text-[var(--color-text-muted)]'
-                    }`}
+                    className={`text-[var(--font-size-xs)] font-[var(--font-weight-medium)] leading-[var(--line-height-tight)] select-none max-lg:text-[10px] max-md:text-[9px] -translate-y-[calc(var(--spacing-xs)/2)] ${isWorking ? 'text-[var(--color-text-secondary)]' : 'text-[var(--color-text-muted)]'
+                      }`}
                     aria-hidden="false"
                   >
                     {slot.label}
@@ -216,6 +276,27 @@ export default function CalendarTimeline({
               </div>
             );
           })}
+
+          {/* Current Time Indicator */}
+          {(() => {
+            // Only show if current time is within view range
+            const currentHour = currentTime.getHours();
+            if (currentHour < startHour || currentHour > endHour) return null;
+
+            const currentMinute = currentTime.getMinutes();
+            const minutesFromStart = (currentHour - startHour) * 60 + currentMinute;
+            const slotsFromStart = minutesFromStart / slotInterval;
+
+            return (
+              <div
+                className="absolute right-0 w-[var(--time-column-width)] border-t-2 border-red-500 z-[var(--z-elevated)] pointer-events-none"
+                style={{
+                  top: `calc(${slotsFromStart} * var(--slot-height))`,
+                }}
+                aria-label="Hora actual"
+              />
+            );
+          })()}
         </div>
       </div>
     </aside>

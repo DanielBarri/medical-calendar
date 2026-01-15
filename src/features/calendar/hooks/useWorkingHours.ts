@@ -15,7 +15,7 @@ import {
   MAX_HOUR,
   MIN_WORKING_HOURS_RANGE,
   STORAGE_KEYS,
-} from '../constants/calendar';
+} from '../../../constants/calendar';
 
 /**
  * Working hours configuration interface
